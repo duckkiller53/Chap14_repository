@@ -24,14 +24,18 @@ class MasterViewController: UITableViewController, LoginViewDelegate, SFSafariVi
     
     
     @IBAction func segmentedControlValueChanged(sender: AnyObject) {
+        // only show add button for my gists
+        if (gistSegmentedControl.selectedSegmentIndex == 2) {
+            self.navigationItem.leftBarButtonItem = self.editButtonItem()
+        } else {
+            self.navigationItem.leftBarButtonItem = nil
+        }
         loadGists(nil)
     }
   
   
   override func viewDidLoad() {
     super.viewDidLoad()
-    // Do any additional setup after loading the view, typically from a nib.
-    self.navigationItem.leftBarButtonItem = self.editButtonItem()
     
     let addButton = UIBarButtonItem(barButtonSystemItem: .Add, target: self, action: "insertNewObject:")
     self.navigationItem.rightBarButtonItem = addButton
@@ -315,19 +319,49 @@ class MasterViewController: UITableViewController, LoginViewDelegate, SFSafariVi
   }
   
   override func tableView(tableView: UITableView, canEditRowAtIndexPath indexPath: NSIndexPath) -> Bool {
-    // Return false if you do not want the specified item to be editable.
-    return true
-  }
-  
-  override func tableView(tableView: UITableView, commitEditingStyle editingStyle: UITableViewCellEditingStyle, forRowAtIndexPath indexPath: NSIndexPath) {
-    if editingStyle == .Delete {
-      gists.removeAtIndex(indexPath.row)
-      tableView.deleteRowsAtIndexPaths([indexPath], withRowAnimation: .Fade)
-    } else if editingStyle == .Insert {
-      // Create a new instance of the appropriate class, insert it into the array,
-      // and add a new row to the table view.
+    // only allow editing my gists.  if were on the third tab, this test will return true.
+    return gistSegmentedControl.selectedSegmentIndex == 2
+    
     }
+  
+  override func tableView(tableView: UITableView, commitEditingStyle editingStyle: UITableViewCellEditingStyle, forRowAtIndexPath indexPath: NSIndexPath)
+  {
+    
+    if editingStyle == .Delete
+    {
+      let gistToDelete = gists.removeAtIndex(indexPath.row)
+      tableView.deleteRowsAtIndexPaths([indexPath], withRowAnimation: .Fade)
+    
+        if let id = gists[indexPath.row].id
+        {
+            GitHubAPIManager.sharedInstance.deleteGist(id, completionHandler: {
+                (error) in
+                print(error)
+                if let _ = error {
+                    
+                    // if an error readd the gist to our array and tableview.
+                    self.gists.insert(gistToDelete, atIndex: indexPath.row)
+                    tableView.insertRowsAtIndexPaths([indexPath], withRowAnimation: .Right)
+                    
+                    // Tell them it didn't work
+                    let alertController = UIAlertController(title: "Could not delete gist",
+                        message: "Sorry, our gist couldn't be deleted.  Maybe GitHub is "
+                    + "down or you don't have an internet connection.",
+                        preferredStyle: .Alert)
+                    // add OK Button
+                        let oKAction = UIAlertAction(title: "OK", style: .Default, handler: nil)
+                    alertController.addAction(oKAction)
+                    // show the alert
+                    self.presentViewController(alertController, animated: true, completion: nil)
+                }
+            })
+        }
+    }
+    
   }
+    
+    
+    
 
 }
 
